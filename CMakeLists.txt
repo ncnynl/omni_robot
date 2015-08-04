@@ -105,16 +105,16 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-# add_executable(omni_robot_node src/omni_robot_node.cpp)
+add_executable(sim_start src/sim_start.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(omni_robot_node omni_robot_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(omni_robot_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(sim_start
+  ${catkin_LIBRARIES}
+)
 
 #############
 ## Install ##
