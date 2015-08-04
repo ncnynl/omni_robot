@@ -2,6 +2,7 @@
 // ros libs
 #include "ros/ros.h"
 #include "std_msgs/String.h"
+#include <geometry_msgs/Twist.h>
 
 // vrep libs
 #include "vrep_common/VrepInfo.h"
@@ -16,10 +17,18 @@
 bool simulationRunning=true;
 float simulationTime=0.0f;
 
+class OmniRobotClient
+{
+   public:
+		float speedMotorFront, speedMotorRear, speedMotorLeft, speedMotorRight = 0;
+
+
+};
+
 void infoCallback(const vrep_common::VrepInfo::ConstPtr& info)
 {
-	simulationTime=info->simulationTime.data;
-	simulationRunning=(info->simulatorState.data&1)!=0;
+  simulationTime=info->simulationTime.data;
+  simulationRunning=(info->simulatorState.data&1)!=0;
 }
 
 void startStopSim(ros::NodeHandle n, int s){
@@ -28,7 +37,7 @@ void startStopSim(ros::NodeHandle n, int s){
     ros::ServiceClient client_simStart = n.serviceClient<vrep_common::simRosStartSimulation>("/vrep/simRosStartSimulation");
     vrep_common::simRosStartSimulation srv_simStart;
     if(client_simStart.call(srv_simStart)){
-      ROS_INFO("Started"); // TODO check if service call response is correct
+      ROS_INFO("Simulation Started!"); // TODO check if service call response is correct
     }
 
   }
@@ -37,39 +46,77 @@ void startStopSim(ros::NodeHandle n, int s){
     ros::ServiceClient client_simStop = n.serviceClient<vrep_common::simRosStopSimulation>("/vrep/simRosStopSimulation");
     vrep_common::simRosStopSimulation srv_simStop;
     if(client_simStop.call(srv_simStop)){
-      ROS_INFO("Started"); // TODO check if service call response is correct
+      ROS_INFO("Simulation Stopped!"); // TODO check if service call response is correct
     }
 
   }
 
 }
 
-	int *getMotorHandles(ros::NodeHandle n){
 
-		int* motorHandlePtr = new int[4];
 
-		ros::ServiceClient client_objectHandle = n.serviceClient<vrep_common::simRosGetObjectHandle>("/vrep/simRosGetObjectHandle");
-		vrep_common::simRosGetObjectHandle srv_objectHandle;
 
-		srv_objectHandle.request.objectName = "OmniWheel1";
-		client_objectHandle.call(srv_objectHandle);
-		motorHandlePtr[0] = srv_objectHandle.response.handle;
+int *getMotorHandles(ros::NodeHandle n){
 
-		srv_objectHandle.request.objectName = "OmniWheel2";
-		client_objectHandle.call(srv_objectHandle);
-		motorHandlePtr[1] = srv_objectHandle.response.handle;
+  int* motorHandlePtr = new int[4];
 
-		srv_objectHandle.request.objectName = "OmniWheel3";
-		client_objectHandle.call(srv_objectHandle);
-		motorHandlePtr[2] = srv_objectHandle.response.handle;
+  ros::ServiceClient client_objectHandle = n.serviceClient<vrep_common::simRosGetObjectHandle>("/vrep/simRosGetObjectHandle");
+  vrep_common::simRosGetObjectHandle srv_objectHandle;
 
-		srv_objectHandle.request.objectName = "OmniWheel4";
-		client_objectHandle.call(srv_objectHandle);
-		motorHandlePtr[3] = srv_objectHandle.response.handle;
+  srv_objectHandle.request.objectName = "OmniWheel45_typeA";
+  client_objectHandle.call(srv_objectHandle);
+  motorHandlePtr[0] = srv_objectHandle.response.handle;
 
-		return motorHandlePtr;
+  srv_objectHandle.request.objectName = "OmniWheel45_typeB";
+  client_objectHandle.call(srv_objectHandle);
+  motorHandlePtr[1] = srv_objectHandle.response.handle;
 
-	}
+  srv_objectHandle.request.objectName = "OmniWheel45_typeA#0";
+  client_objectHandle.call(srv_objectHandle);
+  motorHandlePtr[2] = srv_objectHandle.response.handle;
+
+  srv_objectHandle.request.objectName = "OmniWheel45_typeB#0";
+  client_objectHandle.call(srv_objectHandle);
+  motorHandlePtr[3] = srv_objectHandle.response.handle;
+
+  return motorHandlePtr;
+
+}
+
+
+void powerMotors(ros::NodeHandle n, ros::Publisher motorSpeedPub, double speedMotorFront, double speedMotorRear, double speedMotorLeft, double speedMotorRight ){
+
+  vrep_common::JointSetStateData motorSpeeds;
+  int* motorHandlePtr;
+  motorHandlePtr = getMotorHandles(n);
+
+  motorSpeeds.handles.data.push_back(motorHandlePtr[0]);
+  motorSpeeds.handles.data.push_back(motorHandlePtr[1]);
+  motorSpeeds.handles.data.push_back(motorHandlePtr[2]);
+  motorSpeeds.handles.data.push_back(motorHandlePtr[3]);
+  motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
+  motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
+  motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
+  motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
+  motorSpeeds.values.data.push_back(speedMotorFront);
+  motorSpeeds.values.data.push_back(speedMotorRear);
+  motorSpeeds.values.data.push_back(speedMotorLeft);
+  motorSpeeds.values.data.push_back(speedMotorRight);
+
+  motorSpeedPub.publish(motorSpeeds);
+
+
+}
+
+void teleopKeyboardCb(const geometry_msgs::Twist::ConstPtr& vel){
+
+
+  
+  ROS_INFO("linear x: [%f]", vel->linear.x);
+
+
+}
+
 
 
 int main(int argc, char **argv)
@@ -79,11 +126,11 @@ int main(int argc, char **argv)
   ros::NodeHandle n;
   std_msgs::String topicName;
   topicName.data = "omni";
-	int motorHandles[4];
 
-	ros::Subscriber subInfo=n.subscribe("/vrep/info",1,infoCallback);
+  ros::Subscriber subInfo=n.subscribe("/vrep/info", 1, infoCallback);
   startStopSim(n,0);
-	getMotorHandles(n);
+  getMotorHandles(n);
+  ros::Subscriber subTeleopKey=n.subscribe("cmd_vel", 100, teleopKeyboardCb);
 
   ros::ServiceClient client_enableSubscriber=n.serviceClient<vrep_common::simRosEnableSubscriber>("/vrep/simRosEnableSubscriber");
   vrep_common::simRosEnableSubscriber srv_enableSubscriber;
@@ -91,50 +138,19 @@ int main(int argc, char **argv)
   srv_enableSubscriber.request.topicName="/"+topicName.data+"/wheels"; // the topic name
   srv_enableSubscriber.request.queueSize=1; // the subscriber queue size (on V-REP side)
   srv_enableSubscriber.request.streamCmd=simros_strmcmd_set_joint_state; // the subscriber type
+
   if (client_enableSubscriber.call(srv_enableSubscriber)&&(srv_enableSubscriber.response.subscriberID!=-1)) {
-
-
     ros::Publisher motorSpeedPub=n.advertise<vrep_common::JointSetStateData>("omni/wheels",1);
+
     while (ros::ok() && simulationRunning) {
-      vrep_common::JointSetStateData motorSpeeds;
-			int* motorHandlePtr;
-			motorHandlePtr = getMotorHandles(n);
+      powerMotors(n, motorSpeedPub, 0, 0, 5, -5);
 
-
-      // motorSpeeds.handles.data.push_back(motor1Handle);
-			// motorSpeeds.handles.data.push_back(motor2Handle);
-			// motorSpeeds.handles.data.push_back(motor3Handle);
-			motorSpeeds.handles.data.push_back(motorHandlePtr[1]);
-      // motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
-      // motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
-      // motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
-      motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
-      // motorSpeeds.values.data.push_back(1.0);
-			// motorSpeeds.values.data.push_back(1.0);
-			// motorSpeeds.values.data.push_back(1.0);
-			motorSpeeds.values.data.push_back(1.0);
-      motorSpeedPub.publish(motorSpeeds);
-
+      ros::spinOnce();
     }
+    startStopSim(n,1); // ROS terminated, stop simulation
+    ros::shutdown();
+    return(0);
 
-	ros::shutdown();
-	printf("simulation terminated!\n");
-	return(0);
   }
 
-
-
-
-
-
-
-  //  ros::Rate loop_rate(10);
-
-  ros::spinOnce();
-
-  //    loop_rate.sleep();
-
-
-
-  return 0;
 }
