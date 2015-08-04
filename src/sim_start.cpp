@@ -9,6 +9,7 @@
 #include "vrep_common/simRosStopSimulation.h"
 #include "vrep_common/simRosEnablePublisher.h"
 #include "vrep_common/simRosEnableSubscriber.h"
+#include "vrep_common/simRosGetObjectHandle.h"
 #include "vrep_common/JointSetStateData.h"
 #include "../include/v_repConst.h"
 
@@ -43,6 +44,33 @@ void startStopSim(ros::NodeHandle n, int s){
 
 }
 
+	int *getMotorHandles(ros::NodeHandle n){
+
+		int* motorHandlePtr = new int[4];
+
+		ros::ServiceClient client_objectHandle = n.serviceClient<vrep_common::simRosGetObjectHandle>("/vrep/simRosGetObjectHandle");
+		vrep_common::simRosGetObjectHandle srv_objectHandle;
+
+		srv_objectHandle.request.objectName = "OmniWheel1";
+		client_objectHandle.call(srv_objectHandle);
+		motorHandlePtr[0] = srv_objectHandle.response.handle;
+
+		srv_objectHandle.request.objectName = "OmniWheel2";
+		client_objectHandle.call(srv_objectHandle);
+		motorHandlePtr[1] = srv_objectHandle.response.handle;
+
+		srv_objectHandle.request.objectName = "OmniWheel3";
+		client_objectHandle.call(srv_objectHandle);
+		motorHandlePtr[2] = srv_objectHandle.response.handle;
+
+		srv_objectHandle.request.objectName = "OmniWheel4";
+		client_objectHandle.call(srv_objectHandle);
+		motorHandlePtr[3] = srv_objectHandle.response.handle;
+
+		return motorHandlePtr;
+
+	}
+
 
 int main(int argc, char **argv)
 {
@@ -51,9 +79,11 @@ int main(int argc, char **argv)
   ros::NodeHandle n;
   std_msgs::String topicName;
   topicName.data = "omni";
+	int motorHandles[4];
 
 	ros::Subscriber subInfo=n.subscribe("/vrep/info",1,infoCallback);
   startStopSim(n,0);
+	getMotorHandles(n);
 
   ros::ServiceClient client_enableSubscriber=n.serviceClient<vrep_common::simRosEnableSubscriber>("/vrep/simRosEnableSubscriber");
   vrep_common::simRosEnableSubscriber srv_enableSubscriber;
@@ -67,11 +97,22 @@ int main(int argc, char **argv)
     ros::Publisher motorSpeedPub=n.advertise<vrep_common::JointSetStateData>("omni/wheels",1);
     while (ros::ok() && simulationRunning) {
       vrep_common::JointSetStateData motorSpeeds;
+			int* motorHandlePtr;
+			motorHandlePtr = getMotorHandles(n);
 
 
-      motorSpeeds.handles.data.push_back(16);
+      // motorSpeeds.handles.data.push_back(motor1Handle);
+			// motorSpeeds.handles.data.push_back(motor2Handle);
+			// motorSpeeds.handles.data.push_back(motor3Handle);
+			motorSpeeds.handles.data.push_back(motorHandlePtr[1]);
+      // motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
+      // motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
+      // motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
       motorSpeeds.setModes.data.push_back(2); // 2 is the speed mode
-      motorSpeeds.values.data.push_back(1.0);
+      // motorSpeeds.values.data.push_back(1.0);
+			// motorSpeeds.values.data.push_back(1.0);
+			// motorSpeeds.values.data.push_back(1.0);
+			motorSpeeds.values.data.push_back(1.0);
       motorSpeedPub.publish(motorSpeeds);
 
     }
