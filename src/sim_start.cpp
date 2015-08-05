@@ -16,14 +16,7 @@
 
 bool simulationRunning=true;
 float simulationTime=0.0f;
-
-class OmniRobotClient
-{
-   public:
-		float speedMotorFront, speedMotorRear, speedMotorLeft, speedMotorRight = 0;
-
-
-};
+float speedMotorFront, speedMotorRear, speedMotorLeft, speedMotorRight = 0;
 
 void infoCallback(const vrep_common::VrepInfo::ConstPtr& info)
 {
@@ -84,11 +77,11 @@ int *getMotorHandles(ros::NodeHandle n){
 }
 
 
-void powerMotors(ros::NodeHandle n, ros::Publisher motorSpeedPub, double speedMotorFront, double speedMotorRear, double speedMotorLeft, double speedMotorRight ){
+void powerMotors(int* motorHandlePtr, ros::NodeHandle n, ros::Publisher motorSpeedPub, double speedMotorFront, double speedMotorRear, double speedMotorLeft, double speedMotorRight ){
 
   vrep_common::JointSetStateData motorSpeeds;
-  int* motorHandlePtr;
-  motorHandlePtr = getMotorHandles(n);
+
+
 
   motorSpeeds.handles.data.push_back(motorHandlePtr[0]);
   motorSpeeds.handles.data.push_back(motorHandlePtr[1]);
@@ -109,10 +102,37 @@ void powerMotors(ros::NodeHandle n, ros::Publisher motorSpeedPub, double speedMo
 }
 
 void teleopKeyboardCb(const geometry_msgs::Twist::ConstPtr& vel){
+    ROS_INFO("got a key stroke!");
+
+  if(vel->linear.x != 0 && vel->angular.z == 0){
+      speedMotorLeft = vel->linear.x * 10;
+      speedMotorRight = -vel->linear.x * 10 ;
+      speedMotorFront = 0;
+      speedMotorRear = 0;
+      ROS_INFO("go forward/backwars");
+
+  }
 
 
-  
-  ROS_INFO("linear x: [%f]", vel->linear.x);
+  else if(vel->linear.x == 0 && vel->angular.z != 0){
+      speedMotorFront = -vel->angular.z * 5 ;
+      speedMotorRear = vel->angular.z * 5 ;
+      speedMotorLeft = -vel->angular.z * 5 ;
+      speedMotorRight = -vel->angular.z * 5 ;
+      ROS_INFO("full left/right turn!");
+
+  }
+
+  else if(vel->linear.x == 0 && vel->angular.z == 0){
+      speedMotorFront = 0;
+      speedMotorRear = 0;
+      speedMotorLeft = 0;
+      speedMotorRight = 0;
+      ROS_INFO("stop motors!");
+
+  }
+
+
 
 
 }
@@ -124,13 +144,15 @@ int main(int argc, char **argv)
 
   ros::init(argc, argv, "sim_start");
   ros::NodeHandle n;
+  ros::Rate rate(100);
   std_msgs::String topicName;
   topicName.data = "omni";
+  int* motorHandlePtr;
 
   ros::Subscriber subInfo=n.subscribe("/vrep/info", 1, infoCallback);
   startStopSim(n,0);
   getMotorHandles(n);
-  ros::Subscriber subTeleopKey=n.subscribe("cmd_vel", 100, teleopKeyboardCb);
+  ros::Subscriber subTeleopKey=n.subscribe("cmd_vel", 10, teleopKeyboardCb);
 
   ros::ServiceClient client_enableSubscriber=n.serviceClient<vrep_common::simRosEnableSubscriber>("/vrep/simRosEnableSubscriber");
   vrep_common::simRosEnableSubscriber srv_enableSubscriber;
@@ -141,11 +163,12 @@ int main(int argc, char **argv)
 
   if (client_enableSubscriber.call(srv_enableSubscriber)&&(srv_enableSubscriber.response.subscriberID!=-1)) {
     ros::Publisher motorSpeedPub=n.advertise<vrep_common::JointSetStateData>("omni/wheels",1);
-
+      motorHandlePtr = getMotorHandles(n);
     while (ros::ok() && simulationRunning) {
-      powerMotors(n, motorSpeedPub, 0, 0, 5, -5);
+      powerMotors(motorHandlePtr, n, motorSpeedPub, speedMotorFront, speedMotorRear, speedMotorLeft, speedMotorRight);
 
       ros::spinOnce();
+      rate.sleep();
     }
     startStopSim(n,1); // ROS terminated, stop simulation
     ros::shutdown();
