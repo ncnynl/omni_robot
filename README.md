@@ -1,11 +1,15 @@
-### Omni-wheel Robot Simulation
+## Omni-wheel Robot Simulation
 
 #### 1. Folder Organization
 
 * ros: source/include/launch files
 * sim: VREP scene
 
-#### 2. ROS
+#### 2. VREP
+
+Run VREP and open scene from sim/vrep folder
+
+#### 3. ROS
 
 Launch files:
 
