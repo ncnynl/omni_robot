@@ -1,5 +1,7 @@
 ## Omni-wheel Robot Simulation
 
+Note: This is an ongoing project. For now only keyboard teleop and mapping is available.
+
 #### 1. Folder Organization
 
 * ros: source/include/launch files
